@@ -1,18 +1,18 @@
 package main
 
-import {
+import (
 	"fmt"
+	"time"
+)
 
+func hello(i int) {
+	fmt.Println("hello go:", i)
 }
-
-func hello(i,int){
-	println("hello go:",fmt.println(i))
-}
-func main()  {
+func main() {
 	for i := 0; i < 5; i++ {
-		go func(j int){
+		go func(j int) {
 			hello(j)
 		}(i)
 	}
-	time.sleep(time.Second)
+	time.Sleep(time.Second)
 }

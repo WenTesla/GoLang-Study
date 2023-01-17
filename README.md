@@ -2133,3 +2133,599 @@ func main() {
 
 ```
 
+#### http.go
+
+```go
+// Server1 is a minimal "echo" server.
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/", handler) // each request calls handler
+    log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+// handler echoes the Path component of the request URL r.
+func handler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "URL.Path = %q\n", r.URL.Path)
+}
+```
+
+我们只用了八九行代码就实现了一个Web服务程序，这都是多亏了标准库里的方法已经帮我们完成了大量工作。main函数将所有发送到/路径下的请求和handler函数关联起来，/开头的请求其实就是所有发送到当前站点上的请求，服务监听8000端口。发送到这个服务的“请求”是一个http.Request类型的对象，这个对象中包含了请求中的一系列相关字段，其中就包括我们需要的URL。当请求到达服务器时，这个请求会被传给handler函数来处理，这个函数会将/hello这个路径从请求的URL中解析出来，然后把其发送到响应中，这里我们用的是标准输出流的fmt.Fprintf。
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+	"image"
+	"image/color"
+	"image/gif"
+	"io"
+	"log"
+	"math"
+	"math/rand"
+	"net/http"
+	"strconv"
+)
+
+var palette = []color.Color{color.White, color.Black}
+
+const (
+	whiteIndex = 0 // first color in palette
+	blackIndex = 1 // next color in palette
+)
+
+func lissajous(out io.Writer, myCycles float64) { //接收 cycles参数
+	const (
+		cycles  = 5     // number of complete x oscillator revolutions
+		res     = 0.001 // angular resolution
+		size    = 100   // image canvas covers [-size..+size]
+		nframes = 64    // number of animation frames
+		delay   = 8     // delay between frames in 10ms units
+	)
+	if myCycles == 0 {
+		myCycles = cycles //如果为零，则使用常亮定义的值
+	}
+	freq := rand.Float64() * 3.0 // relative frequency of y oscillator
+	anim := gif.GIF{LoopCount: nframes}
+	phase := 0.0 // phase difference
+	for i := 0; i < nframes; i++ {
+		rect := image.Rect(0, 0, 2*size+1, 2*size+1)
+		img := image.NewPaletted(rect, palette)
+		for t := 0.0; t < myCycles*2*math.Pi; t += res { //使用myCycles变量
+			x := math.Sin(t)
+			y := math.Sin(t*freq + phase)
+			img.SetColorIndex(size+int(x*size+0.5), size+int(y*size+0.5),
+				blackIndex)
+		}
+		phase += 0.1
+		anim.Delay = append(anim.Delay, delay)
+		anim.Image = append(anim.Image, img)
+	}
+	gif.EncodeAll(out, &anim) // NOTE: ignoring encoding errors
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "%s %s %s\n", r.Method, r.URL, r.Proto)
+	fmt.Fprintf(w, "URL.Path = %q\n", r.URL.Path)
+}
+
+func handler_gif(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Print(err)
+	}
+	if r.Form["cycles"] != nil { // 获取cycles参数，并转为int型
+		cycles, err := strconv.Atoi(r.Form["cycles"][0])
+		if err != nil {
+			lissajous(w, float64(cycles))
+		}
+	}
+	lissajous(w, float64(0))
+}
+func main() {
+	http.HandleFunc("/", handler)        // each request calls handler
+	http.HandleFunc("/gif", handler_gif) // each request calls handler
+	log.Println("localhost:8000")
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+```
+
+通过get传参数
+
+如下：
+
+![image-20230115200727029](https://xingqiu-tuchuang-1256524210.cos.ap-shanghai.myqcloud.com/12640/image-20230115200727029.png)
+
+![image-20230115200814185](https://xingqiu-tuchuang-1256524210.cos.ap-shanghai.myqcloud.com/12640/image-20230115200814185.png)
+
+#### new函数
+
+另一个创建变量的方法是调用内建的new函数。表达式new(T)将创建一个T类型的匿名变量，初始化为T类型的零值，然后返回变量地址，返回的指针类型为`*T`。
+
+```Go
+p := new(int)   // p, *int 类型, 指向匿名的 int 变量
+fmt.Println(*p) // "0"
+*p = 2          // 设置 int 匿名变量的值为 2
+fmt.Println(*p) // "2"
+```
+
+下面的两个newInt函数有着相同的行为：
+
+```Go
+func newInt() *int {
+    return new(int)
+}
+
+func newInt() *int {
+    var dummy int
+    return &dummy
+}
+```
+
+每次调用new函数都是返回一个新的变量的地址，因此下面两个地址是不同的：
+
+```Go
+p := new(int)
+q := new(int)
+fmt.Println(p == q) // "false"
+```
+
+#### **package包管理**
+
+结构如下
+
+![image-20230115205545643](https://xingqiu-tuchuang-1256524210.cos.ap-shanghai.myqcloud.com/12640/image-20230115205545643.png)
+
+##### AbsoluteZeroC.go
+
+```go
+package main
+
+import (
+	"Go/src/tempconv"
+	"fmt"
+)
+
+func main() {
+	fmt.Println("AbsoluteZero-K:", tempconv.CToK(tempconv.AbsoluteZeroC))
+	fmt.Println("Freezing-K:", tempconv.CToK(tempconv.FreezingC))
+	fmt.Println("Boilinig-K:", tempconv.CToK(tempconv.BoilingC))
+}
+
+```
+
+##### tempconv.go
+
+```go
+// Package tempconv performs Celsius and Fahrenheit conversions.
+package tempconv
+
+import "fmt"
+
+// 摄氏度
+type Celsius float64
+
+// 华氏度
+type Fahrenheit float64
+
+// Kelvin
+type Kelvin float64
+
+const (
+	//绝对0度
+	AbsoluteZeroC Celsius = -273.15
+	//冰点
+	FreezingC Celsius = 0
+	//沸点
+	BoilingC Celsius = 100
+)
+
+// 输出 根据情况选择 %e 或 %f 以产生更紧凑的（无末尾的0）输出
+func (c Celsius) String() string { return fmt.Sprintf("%g°C", c) }
+
+func (f Fahrenheit) String() string { return fmt.Sprintf("%g°F", f) }
+
+func (k Kelvin) String() string {
+	return fmt.Sprintf("%g°K", k)
+}
+
+//处理Kelvin绝对温度的转换 Kelvin 绝对零度是−273.15°C，Kelvin绝对温度1K和摄氏度1°C的单位间隔是一样的
+
+```
+
+##### cony.go
+
+```go
+package tempconv
+
+// CToF converts a Celsius temperature to Fahrenheit.
+func CToF(c Celsius) Fahrenheit { return Fahrenheit(c*9/5 + 32) }
+
+// FToC converts a Fahrenheit temperature to Celsius.
+func FToC(f Fahrenheit) Celsius { return Celsius((f - 32) * 5 / 9) }
+
+func CToK(c Celsius) Kelvin { return Kelvin(c + AbsoluteZeroC) }
+
+func KToC(k Kelvin) Celsius { return Celsius(k) - AbsoluteZeroC }
+
+```
+
+## web
+
+### gin框架
+
+**github仓库:**
+
+[gin-gonic/gin: Gin is a HTTP web framework written in Go (Golang). It features a Martini-like API with much better performance -- up to 40 times faster. If you need smashing performance, get yourself some Gin. (github.com)](https://github.com/gin-gonic/gin#quick-start)
+
+**使用go mod管理依赖**
+
+**go mod init**
+
+初始化gomod文件
+
+**go get 参数**
+
+参数介绍：
+
+- -d 只下载不安装
+- -f 只有在你包含了 -u 参数的时候才有效，不让 -u 去验证 import 中的每一个都已经获取了，这对于本地 fork 的包特别有用
+- -fix 在获取源码之后先运行 fix，然后再去做其他的事情
+- -t 同时也下载需要为运行测试所需要的包
+- -u 强制使用网络去更新包和它的依赖包
+- -v 显示执行的命令
+
+示例
+
+```shell
+go get -u github.com/gin-gonic/gin
+```
+
+# 高质量编程简介及编码规范
+
+高质量:
+
+- 各种边界条件考虑完备
+- 异常情况处理，稳定性
+- 易读易维护
+
+编程原则
+
+- 简单性
+- 可读性
+- 生产力
+
+## 编码规范
+
+### 公共符号始终要注释
+
+*例外：实现接口的方法不需要注释*
+
+### 格式化
+
+使用**gofmt**（官方工具）自动格式化
+
+### 注释
+
+- 代码作用（适合公共符号）
+- 代码如何实现 （适合注释实现过程）
+- 代码实现的原因（适合解释代码的外部因素和提供额外的上下文）
+- 代码什么情况下出错（适合代码的限制条件）
+
+公共符号始终要注释·包中声明的每个公共的符号:
+变量、常量、函数以及结构都需要添加注释
+.任何既不明显也不简短的公
+共功能必须予以注释
+无论长度或复杂程度如何，
+对库中的任何函数都必须进行注释
+
+### **命名规范**
+
+#### **变量**
+
+**缩略词全大写，但当其位于变量开头且不需要导出时，使用全小写**
+
+- 例如使用ServeHTTP而不是ServeHttp
+- 使用XMLHTTPRequest或者xmlHTTPRequest
+
+- 变量距离其被使用的地方越远，则需要携带越多的上下文信息
+- 全局变量在其名字中需要更多的上下文信息，使得在不同地方可以轻易辨认出其含义
+
+#### **函数**
+
+函数名不携带包名的上下文信息，因为包名和函数名总是成对出现的·函数名尽量简短
+当名为foo的包某个函数返回类型Foo时，可以省略类型信息而不导致歧义
+当名为foo的包某个函数返回类型T时(T并不是Foo)，可以在函数名中加入类型信息
+
+#### package
+
+- 只由小写字母组成。不包含大写字母和下划线等字符·
+- 简短并包含一定的上下文信息。例如schema、task 等·
+- 不要与标准库同名。例如不要使用sync或者strings
+
+以下规则尽量满足，以标准库包名为例
+
+- 不使用常用变量名作为包名。例如使用bufio而不是buf·使用单数而不是复数。例如使用encoding而不是encodings
+- 谨慎地使用缩写。例如使用fmt 在不破坏上下文的情况下比 format 更加简短
+
+### 控制流程
+
+避免嵌套
+
+尽量保存为最小缩进
+
+### 错误处理
+
+#### 简单错误
+
+- 简单的错误指的是仅出现一次的错误，且在其他地方不需要捕获该错误
+- 优先使用errors.New来创建匿名变量来直接表示简单错误
+- 如果有格式化的需求，使用fmt.Errorf
+
+#### 错误的Wrap和 Unwrap
+
+·错误的Wrap 实际上是提供了一个error嵌套另一个error的能力，从而生成一个error的跟踪链
+·在 fmt.Errorf中使用:%w关键字来将一个错误关联至
+错误链中
+
+#### 错误判定
+
+- 判定一个错误是否为特定错误，使用errors.Is
+- 不同于使用==，使用该方法可以判定错误链上的所有错误是否含有特定的错误
+
+#### panic
+
+- 不建议在业务代码中使用panic
+- ·调用函数不包含recover会造成程序崩溃·若问题可以被屏蔽或解决，建议使用error代替panic
+- 当程序启动阶段发生不可逆转的错误时，可以在init 或 main函数中使用panic
+
+# 性能优化
+
+### **benchmark工具**
+
+![image-20230117105733060](https://xingqiu-tuchuang-1256524210.cos.ap-shanghai.myqcloud.com/12640/image-20230117105733060.png)
+
+### slice
+
+**提前指定大小**
+
+**在大切片上创建小切片，使用copy代替**
+
+### string
+
+**使用strings.builder** 和java类似
+
+### 空结构体
+
+使用空结构体struct{}实列不占用空间
+
+### map
+
+map 预分配内存分析
+
+- 不断向map中添加元素的操作会触发map的扩容·
+- 提前分配好空间可以减少内存拷贝和Rehash 的消耗·
+- 建议根据实际需求提前预估好需要的空间
+
+### 使用atomic 包
+
+锁的实现是通过操作系统来实现，属于系统调用.atomic 操作是通过硬件实现，
+
+效率比锁高sync.Mutex应该用来保护一段逻辑，不仅仅用于保护一个变量。
+
+对于非数值操作，可以使用atomic.Value，能承载一个interface}
+
+# 实战
+
+直接拉取仓库
+
+[wolfogre/go-pprof-practice: go pprof practice. (github.com)](https://github.com/wolfogre/go-pprof-practice)
+
+分析的博客:
+
+[golang pprof 实战 | Wolfogre's Blog](https://blog.wolfogre.com/posts/go-ppof-practice/)
+
+**性能分析工具 pprof**
+
+项目目录
+
+![image-20230117112122043](https://xingqiu-tuchuang-1256524210.cos.ap-shanghai.myqcloud.com/12640/image-20230117112122043.png)
+
+没有外部依赖,直接运行即可
+
+保持程序运行，打开浏览器访问 `http://localhost:6060/debug/pprof/`，可以看到如下页面：
+
+![image-20230117114525219](https://xingqiu-tuchuang-1256524210.cos.ap-shanghai.myqcloud.com/12640/image-20230117114525219.png)
+
+页面上展示了可用的程序运行采样数据，分别有：
+
+| 类型         | 描述                       | 备注                                                         |
+| :----------- | :------------------------- | :----------------------------------------------------------- |
+| allocs       | 内存分配情况的采样信息     | 可以用浏览器打开，但可读性不高                               |
+| blocks       | 阻塞操作情况的采样信息     | 可以用浏览器打开，但可读性不高                               |
+| cmdline      | 显示程序启动命令及参数     | 可以用浏览器打开，这里会显示 `./go-pprof-practice`           |
+| goroutine    | 当前所有协程的堆栈信息     | 可以用浏览器打开，但可读性不高                               |
+| heap         | 堆上内存使用情况的采样信息 | 可以用浏览器打开，但可读性不高                               |
+| mutex        | 锁争用情况的采样信息       | 可以用浏览器打开，但可读性不高                               |
+| profile      | CPU 占用情况的采样信息     | 浏览器打开会下载文件                                         |
+| threadcreate | 系统线程创建情况的采样信息 | 可以用浏览器打开，但可读性不高                               |
+| trace        | 程序运行跟踪信息           | 浏览器打开会下载文件，本文不涉及，可另行参阅[《深入浅出 Go trace》](https://blog.wolfogre.com/redirect/v3/AwBGKjtUXC4lQ2UdNqHTCoMSAwM8Cv46xcUtPG6RCPoPbv8CcXH9xQrF_wJJOfr_AlNN-lP_AjMyHP8IQUxTTlFBTjhBFgn-UTESAwM8Cv46xcVaFgY7bkEGFtw7If3FPAZNCsU7Bsw8PAXMPIIcSojF) |
+
+
+
+**命令行**
+
+```shell
+go tool pprof http://localhost:6060/debug/pprof/profile
+```
+
+**topN 查看占用最多的函数**
+
+```shell
+(pprof) top
+Showing nodes accounting for 8.91s, 98.67% of 9.03s total
+Dropped 35 nodes (cum <= 0.05s)
+      flat  flat%   sum%        cum   cum%
+     8.91s 98.67% 98.67%      8.93s 98.89%  github.com/wolfogre/go-pprof-practice/animal/felidae/tiger.(*Tiger).Eat
+         0     0% 98.67%      8.93s 98.89%  github.com/wolfogre/go-pprof-practice/animal/felidae/tiger.(*Tiger).Live
+         0     0% 98.67%      8.97s 99.34%  main.main
+         0     0% 98.67%      8.97s 99.34%  runtime.main
+         0     0% 98.67%      0.05s  0.55%  runtime.systemstack
+
+```
+
+flat=Cum 函数中没有调用其他函数
+
+flat=0 函数中只有其他函数的调用
+
+**输入 `list Eat`，查看问题具体在代码的哪一个位置：根据指定的正则表达式查找**
+
+```shell
+(pprof) list Eat 
+Total: 9.03s
+ROUTINE ======================== github.com/wolfogre/go-pprof-practice/animal/canidae/dog.(*Dog).Eat in H:\go-pprof-practice\animal\canidae\dog\dog.go
+         0       10ms (flat, cum)  0.11% of Total
+         .          .     26:   d.Pee()
+         .          .     27:   d.Run()
+         .          .     28:   d.Howl()
+         .          .     29:}
+         .          .     30:func (d *Dog) Eat() {
+         .       10ms     31:   log.Println(d.Name(), "eat")
+         .          .     32:}
+         .          .     33:
+         .          .     34:func (d *Dog) Drink() {
+         .          .     35:   log.Println(d.Name(), "drink")
+         .          .     36:}
+ROUTINE ======================== github.com/wolfogre/go-pprof-practice/animal/felidae/tiger.(*Tiger).Eat in H:\go-pprof-practice\animal\felidae\tiger\tiger.go
+     8.91s      8.93s (flat, cum) 98.89% of Total
+         .          .     26:无效的循环
+         .          .     27:*/
+         .          .     28:func (t *Tiger) Eat() {
+         .          .     29:   log.Println(t.Name(), "eat")
+         .          .     30:   loop := 10000000000
+     8.91s      8.93s     31:   for i := 0; i < loop; i++ {
+         .          .     32:           // do nothing
+         .          .     33:   }
+         .          .     34:}
+         .          .     35:
+         .          .     36:func (t *Tiger) Drink() {
+
+```
+
+**web 调用关系可视化**
+
+可以访问 [graphviz 官网](https://blog.wolfogre.com/redirect/v3/A421Yoc_xEV4GG_UO8tV1nMSAwM8Cv46xcU7gjwSbQjbbjsviVpukMUYBkEJFgboxTESAwM8Cv46xcVaFgY7bkEGFtw7If3FPAZNCsU7Bsw8PAXMPIIcSojF)寻找适合自己操作系统的安装方法
+
+**调查内存**
+
+```shell
+go tool pprof http://localhost:6060/debug/pprof/heap
+```
+
+top
+
+```shell
+(pprof) top
+Showing nodes accounting for 1.20GB, 100% of 1.20GB total
+Dropped 4 nodes (cum <= 0.01GB)
+      flat  flat%   sum%        cum   cum%
+    1.20GB   100%   100%     1.20GB   100%  github.com/wolfogre/go-pprof-practice/animal/muridae/mouse.(*Mouse).Steal
+         0     0%   100%     1.20GB   100%  github.com/wolfogre/go-pprof-practice/animal/muridae/mouse.(*Mouse).Live
+         0     0%   100%     1.20GB   100%  main.main
+         0     0%   100%     1.20GB   100%  runtime.main
+
+```
+
+查看到占用1G多的内存
+
+**内存回收**
+
+```shell
+go tool pprof http://localhost:6060/debug/pprof/allocs
+```
+
+top
+
+```
+(pprof) top
+Showing nodes accounting for 592MB, 99.75% of 593.50MB total
+Dropped 16 nodes (cum <= 2.97MB)
+      flat  flat%   sum%        cum   cum%
+     592MB 99.75% 99.75%      592MB 99.75%  github.com/wolfogre/go-pprof-practice/animal/canidae/dog.(*Dog).Run (inline)
+         0     0% 99.75%      592MB 99.75%  github.com/wolfogre/go-pprof-practice/animal/canidae/dog.(*Dog).Live
+         0     0% 99.75%      592MB 99.75%  main.main
+         0     0% 99.75%   592.50MB 99.83%  runtime.main
+
+```
+
+可以看到 `github.com/wolfogre/go-pprof-practice/animal/canidae/dog.(*Dog).Run` 会进行无意义的内存申请，而这个函数又会被频繁调用，这才导致程序不停地进行 GC:
+
+```go
+func (d *Dog) Run() {
+	log.Println(d.Name(), "run")
+	_ = make([]byte, 16 * constant.Mi)
+}
+```
+
+**排查协程泄露**
+
+```shell
+go tool pprof http://localhost:6060/debug/pprof/goroutine
+```
+
+```
+(pprof) top
+Showing nodes accounting for 103, 99.04% of 104 total
+Showing top 10 nodes out of 33
+      flat  flat%   sum%        cum   cum%
+       102 98.08% 98.08%        102 98.08%  runtime.gopark
+         1  0.96% 99.04%          1  0.96%  runtime.goroutineProfileWithLabels
+         0     0% 99.04%        100 96.15%  github.com/wolfogre/go-pprof-practice/animal/canidae/wolf.(*Wolf).Drink.func1
+         0     0% 99.04%          1  0.96%  github.com/wolfogre/go-pprof-practice/animal/felidae/cat.(*Cat).Live
+         0     0% 99.04%          1  0.96%  github.com/wolfogre/go-pprof-practice/animal/felidae/cat.(*Cat).Pee
+         0     0% 99.04%          1  0.96%  internal/poll.(*FD).Accept
+         0     0% 99.04%          1  0.96%  internal/poll.(*FD).acceptOne
+         0     0% 99.04%          1  0.96%  internal/poll.(*pollDesc).wait
+         0     0% 99.04%          1  0.96%  internal/poll.execIO
+```
+
+**排查锁的争用**
+
+```
+go tool pprof http://localhost:6060/debug/pprof/mutex
+```
+
+```
+(pprof) top
+Showing nodes accounting for 126.40s, 100% of 126.40s total
+      flat  flat%   sum%        cum   cum%
+   126.40s   100%   100%    126.40s   100%  sync.(*Mutex).Unlock (inline)
+         0     0%   100%    126.40s   100%  github.com/wolfogre/go-pprof-practice/animal/canidae/wolf.(*Wolf).Howl.func1
+
+```
+
+```go
+func (w *Wolf) Howl() {
+	log.Println(w.Name(), "howl")
+
+	m := &sync.Mutex{}
+	m.Lock()
+	go func() {
+		time.Sleep(time.Second)
+		m.Unlock()
+	}()
+	m.Lock()
+}
+```
+
+可以看到，这个锁由主协程 Lock，并启动子协程去 Unlock，主协程会阻塞在第二次 Lock 这儿等待子协程完成任务，但由于子协程足足睡眠了一秒，导致主协程等待这个锁释放足足等了一秒钟。
+
